@@ -1,0 +1,93 @@
+# This program performs a matrix multiplication on a 64x64 matrix.
+# output B = A x A^T
+
+# Register Legend:
+# $0  = value ‘0’
+# $a0 = Value of 'n*n'
+# $t0 = Set Less Than, Loop end if == 0
+# $t1 = Value for ‘i’
+# $t2 = Value of ’n’
+# $t3 = Value for ‘j’
+# $t4 = Value for ‘k’
+# $t5 = Result of ’i+n*j’
+# $t6 = Result of ’i+n*k’
+# $t7 = Result of ’j+n*k’
+# $s0 = Memory location for B[0] [pointer]
+# $s1 = Value of 0 for initialising B[i] = 0
+# $s2 = Value of B[i+n*j]’
+# $s3 = Value for ‘A[i+n*k]’
+# $s4 = Value for ‘A[i+n*k]’
+# $s5 = Memory location for A[0] [pointer]
+# $s6 = Memory location for A[i+n*k]
+# $s7 = Memory location for A[j+n*k]
+# $t8 = Result of A[Y] * A[Z]
+# $t9 = Value for B[0] pointer plus offset
+
+
+# Initialise B as a matrix filled with zeros.
+addi $s0, $zero, 268500992	# set B[0] memory address 
+addi $s5, $zero, 268501008	# set A[0] memory address
+addi $t1, $zero, 0		# set i=0
+addi $a0, $zero, 4096		# set n to n*n = 4096
+
+# Loop through and set all 4096 elements in B to 0.
+LoopB:  slt $t0, $t1, $a0		# if i<4096, set $t0 to 1
+        beq $t0, $zero, DoneB		# if $t0 = 0, loop is over
+        addi $s1, $zero, 0		# set temporary zero register $s1 = 0
+      	sw $s1, 0($s0)			# save $s1 in base $s0 plus 0 offset
+      	addi $s0, $s0, 4		# update memory location base base + 4
+      	addi $t1, $t1, 1		# increment i by 1
+      	j LoopB				# jump to start of loop
+
+DoneB: 
+addi $t1, $zero, 0		# set i=0
+addi $s0, $zero, 268500992	# reset B[0] memory address
+addi $t2, $zero, 64		# set n = 64
+
+# i loop
+Loopi:   slt $t0, $t1, $t2		# if I<64, set $t0 to 1
+      	 beq $t0, $zero, Donei		# if $t0 = 0, loop is over
+	 addi $t3, $zero, 0		# set j=0
+
+	 # j nested loop
+	 Loopj:	slt $t0, $t3, $t2		# if j<64, set $t0 to 1
+      	   	beq $t0, $zero, Donej		# if $t0 = 0, loop is over
+		addi $t4, $zero, 0		# set k=0
+
+	   	# k nested loop
+	  	Loopk:  slt $t0, $t4, $t2		# if k<64, set $t0 to 1
+      	   		beq $t0, $zero, Donek		# if $t0 = 0, loop is over
+			mult $t2, $t3			# (Hi,Lo) = n*j
+			mflo $t5			# $t5 = register Lo
+			mult $t2, $t4 			# (Hi,Lo) = n*k
+			mflo $t6			# $t6 = register Lo
+			add $t7, $t3, $t6		# $t7 = j+n*k
+			add $t5, $t1, $t5 		# $t5 = i+n*j
+			add $t6, $t1, $t6		# $t6 = i+n*k
+			sll $t5, $t5, 2 		# Scale $t5 for word addressing
+			sll $t6, $t6, 2 		# Scale $t6 for word addressing
+			sll $t7, $t7, 2 		# Scale $t7 for word addressing
+			add $s6, $s5, $t6		# $s6 = Address for A[i+n*k]
+			lw $s3, 0($s6)			# load A[i+n*k] into $s3
+			add $s7, $s5, $t7		# $s7 = Address for A[j+n*k]
+			lw $s4, 0($s7)			# load A[j+n*k] into $s4	
+			mult $s3, $s4 	 		# (Hi,Lo) = A[i+n*k]*A[j+n*k]
+			mflo $t8			# $t8 = register Lo
+			add $t9, $s0, $t5		# $t9 = Address for B[i+n*j]
+			lw $s2, 0($t9)			# load B[i+n*j] into $s2
+			add $s2, $s2, $t8		# $s2 = B[i+n*j] + A[i+n*k]*A[j+n*k]
+			sw $s2, 0($t9)			# save $s2 into memory at base+(i+n*kj)
+			addi $t4, $t4, 1		# increment k by 1
+     	 		j Loopk				# jump to start of loopk
+
+		Donek: 	
+		addi $t3, $t3, 1	# increment j by 1
+		j Loopj			# jump to start of loopj
+
+	Donej: 	
+	addi $t1, $t1, 1	# increment i by 1
+	j Loopi			# jump to start of loopi
+	
+Donei:
+
+
